@@ -24,7 +24,7 @@ app.add_middleware(
 # CONFIG
 # ==============================
 
-SUBREDDITS = ["worldnews", "technology", "business",  "investing", "economic"]
+SUBREDDITS = ["worldnews", "technology", "business", "investment"]
 POST_LIMIT = 25
 CACHE_TTL = timedelta(minutes=30)
 
@@ -37,7 +37,7 @@ tracked_keywords = [
 weights = {
     "fomc": 5,
     "rate cut": 5,
-    "interest rate": 4,
+    "unemployment claim": 4,
     "inflation": 4,
     "fed": 4,
     "war": 5,
@@ -46,10 +46,12 @@ weights = {
     "silver": 3,
     "oil": 3,
     "crude": 3,
-    "china": 2,
-    "russia": 2,
+    "conflict": 5,
+    "attack": 5,
     "treasury yields" : 4,
-    "dxy": 5
+    "dxy": 5,
+    "cpi":3,
+
 }
 
 categories = {
@@ -60,11 +62,14 @@ categories = {
 }
 
 stopwords = {
-    "the","is","in","on","at","of","and","a","to","for","with","as","by","an","be","are","was"
+    "the","is","in","on","at","of","and","a","to","for","with","as","by","an","be","are","was",
+    "that","this","it","from","into","about","over","after","before","between","while",
+    "said","says","will","has","have","had","not","but","they","them","their","you","your",
+    "i", "we", "he","she"
 }
 
 ignore = {
-    "says","said","new","will","after","over","more","has","have"
+    "says","said","new","will","after","over","more","has","have","from","thread","that"
 }
 
 # ==============================
