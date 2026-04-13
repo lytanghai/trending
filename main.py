@@ -70,19 +70,39 @@ lock = threading.Lock()
 
 def fetch_trends():
     titles = []
-    headers = {"User-Agent": "trend-app"}
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+    }
 
     for sub in SUBREDDITS:
         url = f"https://www.reddit.com/r/{sub}/hot.json?limit={POST_LIMIT}"
 
         try:
             res = requests.get(url, headers=headers, timeout=10)
-            data = res.json()
 
-            for post in data["data"]["children"]:
-                titles.append(post["data"]["title"])
+            # 🚨 IMPORTANT: check status first
+            if res.status_code != 200:
+                print(f"Blocked {sub}: {res.status_code}")
+                continue
 
-        except Exception:
+            # 🚨 SAFE JSON parsing
+            try:
+                data = res.json()
+            except Exception:
+                print(f"Invalid JSON from {sub}")
+                continue
+
+            # extract titles safely
+            children = data.get("data", {}).get("children", [])
+
+            for post in children:
+                title = post.get("data", {}).get("title")
+                if title:
+                    titles.append(title)
+
+        except Exception as e:
+            print(f"Error fetching {sub}: {e}")
             continue
 
     titles = list(set(titles))
@@ -132,7 +152,6 @@ def fetch_trends():
         "categories": sorted_categories,
         "generated_at": datetime.utcnow().isoformat()
     }
-
 # ==============================
 # CACHE HANDLER (30 min)
 # ==============================
