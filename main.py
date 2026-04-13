@@ -59,7 +59,8 @@ STOPWORDS = {
     "the","is","in","on","at","of","and","a","to","for","with","as","by","an",
     "be","are","was","that","this","it","from","into","about","over","after",
     "before","between","while","said","says","will","has","have","had","not",
-    "but","they","them","their","you","your","i","we","he","she"
+    "but","they","them","their","you","your","i","we","he","she", "what", "more", 
+    "less", "business", "high", "low", "medium"
 }
 
 NOISE_WORDS = {
@@ -134,7 +135,7 @@ def compute_keywords(titles):
     words = extract_words(titles)
     counter = Counter(words)
 
-    return counter.most_common(10)
+    return counter.most_common(5)
 
 
 # =========================
