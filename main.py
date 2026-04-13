@@ -1,43 +1,45 @@
 from fastapi import FastAPI
 import requests
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime, timedelta
 import threading
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# =========================
+# CORS
+# =========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://byte-income.onrender.com"  # optional
+        "https://byte-income.onrender.com"
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ==============================
+# =========================
 # CONFIG
-# ==============================
-
+# =========================
 SUBREDDITS = ["worldnews", "technology", "business", "investment"]
 POST_LIMIT = 25
 CACHE_TTL = timedelta(minutes=30)
 
-tracked_keywords = [
-    "fomc", "rate cut", "interest rate", "inflation", "fed",
+TRACKED_KEYWORDS = {
+    "fomc", "rate cut", "inflation", "fed",
     "gold", "silver", "oil", "crude",
-    "war", "conflict", "china", "russia", "recession"
-]
+    "war", "conflict", "china", "russia",
+    "recession", "cpi", "dxy", "treasury yields"
+}
 
-weights = {
+WEIGHTS = {
     "fomc": 5,
     "rate cut": 5,
-    "unemployment claim": 4,
     "inflation": 4,
     "fed": 4,
     "war": 5,
@@ -46,134 +48,113 @@ weights = {
     "silver": 3,
     "oil": 3,
     "crude": 3,
-    "conflict": 5,
-    "attack": 5,
-    "treasury yields" : 4,
+    "china": 2,
+    "russia": 2,
     "dxy": 5,
-    "cpi":3,
-
+    "cpi": 3,
+    "treasury yields": 4,
 }
 
-categories = {
-    "monetary": ["fomc", "rate cut", "interest rate", "inflation", "fed"],
-    "commodities": ["gold", "silver", "oil", "crude"],
-    "geopolitics": ["war", "conflict", "china", "russia"],
-    "economy": ["recession"]
+STOPWORDS = {
+    "the","is","in","on","at","of","and","a","to","for","with","as","by","an",
+    "be","are","was","that","this","it","from","into","about","over","after",
+    "before","between","while","said","says","will","has","have","had","not",
+    "but","they","them","their","you","your","i","we","he","she"
 }
 
-stopwords = {
-    "the","is","in","on","at","of","and","a","to","for","with","as","by","an","be","are","was",
-    "that","this","it","from","into","about","over","after","before","between","while",
-    "said","says","will","has","have","had","not","but","they","them","their","you","your",
-    "i", "we", "he","she"
+NOISE_WORDS = {
+    "new","thread","post","reddit","comment","video","live","update","breaking"
 }
 
-ignore = {
-    "says","said","new","will","after","over","more","has","have","from","thread","that"
-}
-
-# ==============================
+# =========================
 # CACHE
-# ==============================
-
-cache = {
-    "data": None,
-    "timestamp": None
-}
-
+# =========================
+cache = {"data": None, "timestamp": None}
 lock = threading.Lock()
 
-# ==============================
-# CORE LOGIC
-# ==============================
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"
+}
 
-def fetch_trends():
-    titles = []
+# =========================
+# HELPERS
+# =========================
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
-    }
+def is_valid_word(w: str) -> bool:
+    return (
+        w not in STOPWORDS and
+        w not in NOISE_WORDS and
+        len(w) > 3 and
+        w.isalpha()
+    )
 
-    for sub in SUBREDDITS:
-        url = f"https://www.reddit.com/r/{sub}/hot.json?limit={POST_LIMIT}"
 
-        try:
-            res = requests.get(url, headers=headers, timeout=10)
-
-            # 🚨 IMPORTANT: check status first
-            if res.status_code != 200:
-                print(f"Blocked {sub}: {res.status_code}")
-                continue
-
-            # 🚨 SAFE JSON parsing
-            try:
-                data = res.json()
-            except Exception:
-                print(f"Invalid JSON from {sub}")
-                continue
-
-            # extract titles safely
-            children = data.get("data", {}).get("children", [])
-
-            for post in children:
-                title = post.get("data", {}).get("title")
-                if title:
-                    titles.append(title)
-
-        except Exception as e:
-            print(f"Error fetching {sub}: {e}")
-            continue
-
-    titles = list(set(titles))
-
-    # ================= GENERAL KEYWORDS =================
+def extract_words(texts):
     words = []
 
-    for title in titles:
-        tokens = re.findall(r'\b[a-zA-Z]{3,}\b', title.lower())
-        filtered = [w for w in tokens if w not in stopwords and w not in ignore]
-        words.extend(filtered)
+    for t in texts:
+        tokens = re.findall(r'\b[a-zA-Z]{3,}\b', t.lower())
+        words.extend([w for w in tokens if is_valid_word(w)])
 
-    top_keywords = Counter(words).most_common(10)
+    return words
 
-    # ================= TRACKED KEYWORDS =================
-    # keyword_count = Counter()
 
-    # for title in titles:
-    #     lower_title = title.lower()
+def fetch_reddit(sub: str):
+    url = f"https://www.reddit.com/r/{sub}/hot.json?limit={POST_LIMIT}"
 
-    #     for kw in tracked_keywords:
-    #         if re.search(rf'\b{re.escape(kw)}\b', lower_title):
-    #             keyword_count[kw] += 1
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
 
-    # # ================= WEIGHTED SCORE =================
-    # keyword_score = {
-    #     kw: count * weights.get(kw, 1)
-    #     for kw, count in keyword_count.items()
-    # }
+        if res.status_code != 200:
+            print(f"[WARN] {sub} blocked: {res.status_code}")
+            return []
 
-    # sorted_keywords = sorted(keyword_score.items(), key=lambda x: x[1], reverse=True)
+        data = res.json()
+        return [
+            p["data"]["title"]
+            for p in data.get("data", {}).get("children", [])
+            if p.get("data", {}).get("title")
+        ]
 
-    # # ================= CATEGORY SCORE =================
-    # category_score = defaultdict(int)
+    except Exception as e:
+        print(f"[ERROR] {sub}: {e}")
+        return []
 
-    # for category, kws in categories.items():
-    #     for kw in kws:
-    #         category_score[category] += keyword_score.get(kw, 0)
 
-    # sorted_categories = sorted(category_score.items(), key=lambda x: x[1], reverse=True)
+def get_all_titles():
+    titles = []
+
+    for sub in SUBREDDITS:
+        titles.extend(fetch_reddit(sub))
+
+    return list(set(titles))
+
+
+def compute_keywords(titles):
+    words = extract_words(titles)
+    counter = Counter(words)
+
+    return counter.most_common(10)
+
+
+# =========================
+# CORE ENGINE
+# =========================
+
+def fetch_trends():
+    titles = get_all_titles()
+
+    top_keywords = compute_keywords(titles)
 
     return {
-        # "titles": titles[:20],
         "top_keywords": top_keywords,
-        # "tracked_keywords": dict(keyword_count),
-        # "weighted_keywords": sorted_keywords,
-        # "categories": sorted_categories,
         "generated_at": datetime.utcnow().isoformat()
     }
-# ==============================
-# CACHE HANDLER (30 min)
-# ==============================
+
+
+# =========================
+# CACHE HANDLER
+# =========================
 
 def get_cached_trends():
     with lock:
@@ -183,20 +164,20 @@ def get_cached_trends():
             if now - cache["timestamp"] < CACHE_TTL:
                 return cache["data"]
 
-        # refresh cache
-        data = fetch_trends()
-        cache["data"] = data
+        cache["data"] = fetch_trends()
         cache["timestamp"] = now
 
-        return data
+        return cache["data"]
 
-# ==============================
-# API ENDPOINTS
-# ==============================
+
+# =========================
+# API
+# =========================
 
 @app.get("/trends")
 def trends():
     return get_cached_trends()
+
 
 @app.get("/health")
 def health():
