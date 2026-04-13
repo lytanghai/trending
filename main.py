@@ -11,8 +11,8 @@ app = FastAPI()
 # CONFIG
 # ==============================
 
-SUBREDDITS = ["worldnews", "technology", "business"]
-POST_LIMIT = 20
+SUBREDDITS = ["worldnews", "technology", "business",  "investing", "economic"]
+POST_LIMIT = 25
 CACHE_TTL = timedelta(minutes=30)
 
 tracked_keywords = [
@@ -35,7 +35,8 @@ weights = {
     "crude": 3,
     "china": 2,
     "russia": 2,
-    "recession": 4
+    "treasury yields" : 4,
+    "dxy": 5
 }
 
 categories = {
@@ -118,38 +119,38 @@ def fetch_trends():
     top_keywords = Counter(words).most_common(10)
 
     # ================= TRACKED KEYWORDS =================
-    keyword_count = Counter()
+    # keyword_count = Counter()
 
-    for title in titles:
-        lower_title = title.lower()
+    # for title in titles:
+    #     lower_title = title.lower()
 
-        for kw in tracked_keywords:
-            if re.search(rf'\b{re.escape(kw)}\b', lower_title):
-                keyword_count[kw] += 1
+    #     for kw in tracked_keywords:
+    #         if re.search(rf'\b{re.escape(kw)}\b', lower_title):
+    #             keyword_count[kw] += 1
 
-    # ================= WEIGHTED SCORE =================
-    keyword_score = {
-        kw: count * weights.get(kw, 1)
-        for kw, count in keyword_count.items()
-    }
+    # # ================= WEIGHTED SCORE =================
+    # keyword_score = {
+    #     kw: count * weights.get(kw, 1)
+    #     for kw, count in keyword_count.items()
+    # }
 
-    sorted_keywords = sorted(keyword_score.items(), key=lambda x: x[1], reverse=True)
+    # sorted_keywords = sorted(keyword_score.items(), key=lambda x: x[1], reverse=True)
 
-    # ================= CATEGORY SCORE =================
-    category_score = defaultdict(int)
+    # # ================= CATEGORY SCORE =================
+    # category_score = defaultdict(int)
 
-    for category, kws in categories.items():
-        for kw in kws:
-            category_score[category] += keyword_score.get(kw, 0)
+    # for category, kws in categories.items():
+    #     for kw in kws:
+    #         category_score[category] += keyword_score.get(kw, 0)
 
-    sorted_categories = sorted(category_score.items(), key=lambda x: x[1], reverse=True)
+    # sorted_categories = sorted(category_score.items(), key=lambda x: x[1], reverse=True)
 
     return {
-        "titles": titles[:20],
+        # "titles": titles[:20],
         "top_keywords": top_keywords,
-        "tracked_keywords": dict(keyword_count),
-        "weighted_keywords": sorted_keywords,
-        "categories": sorted_categories,
+        # "tracked_keywords": dict(keyword_count),
+        # "weighted_keywords": sorted_keywords,
+        # "categories": sorted_categories,
         "generated_at": datetime.utcnow().isoformat()
     }
 # ==============================
