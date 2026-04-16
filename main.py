@@ -181,6 +181,7 @@ def trends():
 
 
 @app.get("/health")
+@app.head("/health")  # Add this line to support HEAD requests
 def health():
     return {
         "status": "ok",
