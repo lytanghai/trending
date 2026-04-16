@@ -1,43 +1,28 @@
-name: Production Health Check
-
-on:
-  schedule:
-    # Multiple cron expressions for redundancy
-    - cron: '*/10 * * * *'   # At 0,10,20,30,40,50 minutes
-    - cron: '5,15,25,35,45,55 * * * *'  # 5 minutes offset (backup)
-    - cron: '2,12,22,32,42,52 * * * *'  # 2 minutes offset (second backup)
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches: [ main ]
-
-jobs:
-  ping-production:
-    name: Ping Production Application
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check Production Health Endpoint
-        run: |
-          PROD_URL="https://trending-jzzf.onrender.com/health"
-          echo "🏥 Checking health endpoint: $PROD_URL"
-          echo "⏰ Time: $(date)"
-          
-          # Send HTTP HEAD request (lightweight)
-          RESPONSE_CODE=$(curl -I \
-            --silent \
-            --output /dev/null \
-            --write-out "%{http_code}" \
-            --connect-timeout 15 \
-            --max-time 30 \
-            --retry 3 \
-            --retry-delay 5 \
-            "$PROD_URL")
-          
-          echo "HTTP Status: $RESPONSE_CODE"
-          
-          if [[ $RESPONSE_CODE -eq 200 ]]; then
-            echo "✅ Health check passed!"
-          else
-            echo "❌ Health check failed with status $RESPONSE_CODE"
-            exit 1
-          fi
+- name: Check Production Health Endpoint
+  run: |
+    PROD_URL="https://trending-jzzf.onrender.com/health"
+    echo "🏥 Checking health endpoint: $PROD_URL"
+    echo "⏰ Time: $(date)"
+    
+    # Remove the -I flag to use GET instead of HEAD
+    RESPONSE_CODE=$(curl \
+      --silent \
+      --output /dev/null \
+      --write-out "%{http_code}" \
+      --connect-timeout 15 \
+      --max-time 30 \
+      --retry 3 \
+      --retry-delay 5 \
+      "$PROD_URL")
+    
+    echo "HTTP Status: $RESPONSE_CODE"
+    
+    if [[ $RESPONSE_CODE -eq 200 ]]; then
+      echo "✅ Health check passed!"
+      # Optional: verify the response body
+      BODY=$(curl --silent "$PROD_URL")
+      echo "Response: $BODY"
+    else
+      echo "❌ Health check failed with status $RESPONSE_CODE"
+      exit 1
+    fi
