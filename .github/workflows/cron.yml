@@ -22,8 +22,8 @@ jobs:
           echo "🏥 Checking health endpoint: $PROD_URL"
           echo "⏰ Time: $(date)"
           
-          # Send HTTP HEAD request (lightweight)
-          RESPONSE_CODE=$(curl -I \
+          # Send HTTP GET request (changed from HEAD to GET)
+          RESPONSE_CODE=$(curl \
             --silent \
             --output /dev/null \
             --write-out "%{http_code}" \
@@ -37,6 +37,11 @@ jobs:
           
           if [[ $RESPONSE_CODE -eq 200 ]]; then
             echo "✅ Health check passed!"
+            # Optional: Verify the response body contains "ok"
+            BODY=$(curl --silent "$PROD_URL")
+            if echo "$BODY" | grep -q '"status":"ok"'; then
+              echo "✅ Response body verified: $BODY"
+            fi
           else
             echo "❌ Health check failed with status $RESPONSE_CODE"
             exit 1
